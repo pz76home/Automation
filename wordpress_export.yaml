@@ -1,6 +1,7 @@
 ---
 - hosts: localhost
 
+
   tasks:
 
   - name: Set time
@@ -43,3 +44,43 @@
     archive:
       path: /data/wordpress_test/var/www/html
       dest: "/wordpress_test/wordpress_test_{{ temp }}.tgz"
+
+  - name: start import
+    debug:
+      msg: "Starting data import process"
+
+  - name: change database configuration for production
+    replace:
+      path: /wordpress_test/wordpress2.sql
+      regexp: 'http://192.168.0.2:8001'
+      replace: "http://192.168.0.2:8010"
+
+  - name: Stop production web services
+    command: /usr/local/bin/docker-compose down
+    args:
+      chdir: /wordpress_test
+
+  - name: Synchronize content to production
+    synchronize:
+      src: /data/wordpress2/var/www/html
+      dest: /data/wordpress_test/var/www
+      delete: yes
+
+  - name: start production web services
+    command: /usr/local/bin/docker-compose up -d
+    args:
+      chdir: /wordpress_test
+
+  - name: import test database
+    mysql_db:
+      state: import
+      name: wordpress
+      login_host: 192.168.0.2
+      config_file: /root/.my.cnf.db
+      login_port: 3320
+      login_user: root
+      target: /wordpress_test/wordpress2.sql
+
+  - name: production update complete
+    debug:
+      msg: Wordpress backups and update complete
