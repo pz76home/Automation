@@ -1,29 +1,31 @@
+# Docker example. Need rsync, MySQL-python installed. Configure separate .my.cnf files for databases.
 ---
-- hosts: localhost
-
+- hosts: web
 
   tasks:
 
   - name: Set time
-    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d\"')}}"
+    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d-%H-%M-%S\"')}}"
 
   - name: export development database
     mysql_db:
       state: dump
       name: wordpress
-      login_unix_socket: /var/run/mysqld/mysqld.sock
+      #login_unix_socket: /var/run/mysqld/mysqld.sock (Ubuntu wanted this, wasn't required for centos)
       login_host: 192.168.0.2
+      login_port: 3320
       config_file: /root/.my.cnf
-      target: /wordpress_test/wordpress2.sql
+      target: /wordpress_prod/wordpress_test.sql
 
   - name: backup development database
     mysql_db:
       state: dump
       name: wordpress
-      login_unix_socket: /var/run/mysqld/mysqld.sock
+      #login_unix_socket: /var/run/mysqld/mysqld.sock (Ubuntu wanted this, wasn't required for centos)
       login_host: 192.168.0.2
+      login_port: 3320
       config_file: /root/.my.cnf
-      target: "/wordpress2/wordpress2_{{ temp }}.sql"
+      target: "/wordpress_test/wordpress_test_{{ temp }}.sql"
 
   - name: backup production database
     mysql_db:
@@ -31,19 +33,19 @@
       name: wordpress
       login_host: 192.168.0.2
       config_file: /root/.my.cnf.db
-      login_port: 3320
+      login_port: 3308
       login_user: root
-      target: "/wordpress_test/wordpress_{{ temp }}.sql"
+      target: "/wordpress_prod/wordpress_prod_{{ temp }}.sql"
 
   - name: backup development web content
     archive:
-      path: /data/wordpress2/var/www/html
-      dest: "/wordpress2/wordpress2_{{ temp }}.tgz"
+      path: /var/lib/docker/volumes/wordpresstest_html/_data
+      dest: "/wordpress_test/wordpress_test__{{ temp }}.tgz"
 
   - name: backup production web content
     archive:
-      path: /data/wordpress_test/var/www/html
-      dest: "/wordpress_test/wordpress_test_{{ temp }}.tgz"
+      path: /var/lib/docker/volumes/wordpressprod_html/_data
+      dest: "/wordpress_prod/wordpress_prod_{{ temp }}.tgz"
 
   - name: start import
     debug:
@@ -51,25 +53,26 @@
 
   - name: change database configuration for production
     replace:
-      path: /wordpress_test/wordpress2.sql
-      regexp: 'http://192.168.0.2:8001'
-      replace: "http://192.168.0.2:8010"
+      path: /wordpress_prod/wordpress_test.sql
+      regexp: 'http://192.168.0.2:8007'
+      replace: "http://192.168.0.2:8009"
 
   - name: Stop production web services
     command: /usr/local/bin/docker-compose down
     args:
-      chdir: /wordpress_test
+      chdir: /wordpress_prod
 
   - name: Synchronize content to production
     synchronize:
-      src: /data/wordpress2/var/www/html
-      dest: /data/wordpress_test/var/www
+      src: /var/lib/docker/volumes/wordpresstest_html/_data
+      dest: /var/lib/docker/volumes/wordpressprod_html
       delete: yes
+    delegate_to: 192.168.0.2
 
   - name: start production web services
     command: /usr/local/bin/docker-compose up -d
     args:
-      chdir: /wordpress_test
+      chdir: /wordpress_prod
 
   - name: import test database
     mysql_db:
@@ -77,9 +80,9 @@
       name: wordpress
       login_host: 192.168.0.2
       config_file: /root/.my.cnf.db
-      login_port: 3320
+      login_port: 3308
       login_user: root
-      target: /wordpress_test/wordpress2.sql
+      target: /wordpress_prod/wordpress_test.sql
 
   - name: production update complete
     debug:
