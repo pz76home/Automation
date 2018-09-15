@@ -1,0 +1,159 @@
+- name: VM change IP address
+    hosts: localhost
+    gather_facts: no
+    connection: local
+    vars:
+      vcenter_hostname: 192.168.1.98
+      network: "VMWARE NEW - 192.168.2.0/24 - VLAN 100"
+      vmcluster: "VMware Cluster"
+      existing_network: "VMWARE - 192.168.1.0/24 - VLAN 50"
+      ip_address: 192.168.2.50
+      local_admin: "password"
+      new_gateway: 192.168.2.254
+      notes: Created by Ansible
+      dumpfacts: false
+    tasks:
+      - name: Check for required variables
+        fail: msg="Must pass name"
+        when: name is not defined
+
+      - name: Check for vSphere access parameters
+        fail: msg="Must set vcenter_user and vcenter_pass in a Vault"
+        when: (vcenter_user is not defined) or (vcenter_pass is not defined)
+
+      - name: Create new adapter
+        vmware_guest:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          name: "{{ name }}"
+          networks:
+            - name: "{{ existing_network }}"
+            - name: "{{ network }}"
+              device_type: vmxnet3
+          state: present
+
+      - name: Create temp directory
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: "{{ vcenter_user }}"
+          vm_password: "{{ vcenter_pass }}"
+          vm_shell: 'C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe'
+          vm_shell_args: 'mkdir C:\temp'
+          vm_shell_cwd: 'C:\Windows\temp'
+          wait_for_process: True
+        ignore_errors: yes
+
+      - name: Set Powershell Policy
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe'
+          vm_shell_args: 'Powershell -command Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force'
+          vm_shell_cwd: 'C:\Windows\temp'
+          wait_for_process: True
+
+      - name: Copy Scripts
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: "{{ vcenter_user }}"
+          vm_password: "{{ vcenter_pass }}"
+          vm_shell: 'C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe'
+          vm_shell_args: 'cp \\Server\Shared` Folder\automation\network*.* C:\temp\'
+          vm_shell_cwd: 'C:\Windows\temp'
+          wait_for_process: True
+
+      - name: Change Windows Network Adapter Name
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe'
+          vm_shell_args: 'C:\temp\network.bat > C:\temp\network.log'
+          vm_shell_cwd: 'C:\Windows\temp'
+          wait_for_process: True
+
+      - name: Change Windows Network Adapter IP address and Gateway
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'netsh.exe'
+          vm_shell_args: 'interface ip set address "EthernetNew" static {{ ip_address }} 255.255.255.0 {{ new_gateway }} '
+          vm_shell_cwd: 'C:\Windows\System32'
+          wait_for_process: True
+
+      - name: Add DNS Server 1
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'netsh.exe'
+          vm_shell_args: 'interface ip add dns "EthernetNew" 192.168.1.80'
+          vm_shell_cwd: 'C:\Windows\System32'
+          wait_for_process: True
+        ignore_errors: yes
+
+      - name: Add DNS Server 2
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'netsh.exe'
+          vm_shell_args: 'interface ip add dns "EthernetNew" 192.168.2.80 index=2'
+          vm_shell_cwd: 'C:\Windows\System32'
+          wait_for_process: True
+        ignore_errors: yes
+
+      - name: Disable original adapter
+        vmware_vm_shell:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}"
+          password: "{{ vcenter_pass }}"
+          datacenter: "Data Centre"
+          vm_id: "{{ name }}"
+          vm_username: '{{ name }}\Administrator'
+          vm_password: "{{ local_admin }}"
+          vm_shell: 'C:\Windows\System32\WindowsPowershell\v1.0\powershell.exe'
+          vm_shell_args: 'C:\temp\network_disable.bat >> C:\temp\network.log'
+          vm_shell_cwd: 'C:\Windows\temp'
+          wait_for_process: False
