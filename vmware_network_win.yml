@@ -1,3 +1,5 @@
+# Add a new Windows Network Adapter and IP address, then disable the old adapter. 
+
 - name: VM change IP address
     hosts: localhost
     gather_facts: no
