@@ -1,0 +1,86 @@
+- hosts: web_prod
+
+  tasks:
+
+  - name: Set time
+    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d-%H-%M-%S\"')}}"
+
+  - name: backup production latest database
+    mysql_db:
+      state: dump
+      login_host: "{{ inventory_hostname }}"
+      name: wordpress
+      config_file: /root/.my.cnf
+      target: "/wordpress_prod/wordpress_prod_latest.sql"
+
+  - name: backup production latest web content
+    archive:
+      path: /var/lib/docker/volumes/wordpress_prod_html/_data
+      dest: "/wordpress_prod/wordpress_prod_latest.tgz"
+
+  - name: backup production database
+    mysql_db:
+      state: dump
+      login_host: "{{ inventory_hostname }}"
+      name: wordpress
+      config_file: /root/.my.cnf
+      target: "/wordpress_prod/wordpress_prod_{{ temp }}.sql"
+
+  - name: backup production web content
+    archive:
+      path: /var/lib/docker/volumes/wordpress_prod_html/_data
+      dest: "/wordpress_prod/wordpress_prod_{{ temp }}.tgz"
+
+  - name: start import
+    debug:
+      msg: "Starting data import process"
+
+  - name: Synchronize test DB sql file
+    synchronize:
+      mode: pull
+      src: rsync://test.company.com/wordpress_test/wordpress_test.sql
+      dest: /wordpress_prod
+      delete: yes
+    delegate_to: "{{ inventory_hostname }}"
+
+  - name: change database configuration for production
+    replace:
+      path: /wordpress_prod/wordpress_test.sql
+      regexp: 'http://test.company.com'
+      replace: "http://www.company.com"
+
+  - name: Stopping Production web services
+    debug:
+      msg: Wordpress Prod web services shutdown for backups and export
+
+  - name: import test database
+    mysql_db:
+      state: import
+      login_host: "{{ inventory_hostname }}"
+      name: wordpress
+      config_file: /root/.my.cnf
+      login_user: root
+      target: /wordpress_prod/wordpress_test.sql
+
+  - name: Stop production web services
+    command: /usr/local/bin/docker-compose down
+    args:
+      chdir: /wordpress_prod
+
+  - name: Synchronize test content 
+    synchronize:
+      mode: pull
+      src: rsync://test.company.com/html
+      dest: /var/lib/docker/volumes/wordpress_prod_html/_data
+      recursive: yes
+      delete: yes
+    delegate_to: "{{ inventory_hostname }}"
+
+  - name: start production web services
+    command: /usr/local/bin/docker-compose up -d
+    args:
+      chdir: /wordpress_prod
+
+  - name: Starting Production web services
+    debug:
+      msg: Wordpress Prod web services available
