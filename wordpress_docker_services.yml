@@ -1,0 +1,16 @@
+  - name: Wordpress services
+    hosts: all
+    vars:
+      status: down
+
+    tasks:
+
+      - name: start/stop web services
+        command: "/usr/local/bin/docker-compose {{ status }}"
+        args:
+          chdir: "/wordpress_{{ area }}"
+
+      - name: Wordpress status
+        debug:
+          msg: "Wordpress {{ inventory_hostname }} is {{ status }}"
+          
