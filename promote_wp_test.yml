@@ -1,0 +1,45 @@
+- hosts: web_test
+  any_errors_fatal: true
+  tasks:
+
+  - name: Set time
+    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d-%H-%M-%S\"')}}"
+
+  - name: export development database
+    mysql_db:
+      state: dump
+      login_host: "{{ inventory_hostname }}"
+      name: wordpress
+      config_file: /root/.my.cnf
+      target: /wordpress_test/wordpress_test.sql
+
+  - name: backup development database
+    mysql_db:
+      state: dump
+      login_host: "{{ inventory_hostname }}"
+      name: wordpress
+      config_file: /root/.my.cnf
+      target: "/wordpress_test/wordpress_test_{{ temp }}.sql"
+
+  - name: Stopping test web services
+    debug:
+      msg: Wordpress test web services shutdown for backups and export
+
+  - name: Stop test web services
+    command: /usr/local/bin/docker-compose down
+    args:
+      chdir: /wordpress_test
+
+  - name: backup development web content
+    archive:
+      path: /var/lib/docker/volumes/wordpress_test_html/_data
+      dest: "/wordpress_test/wordpress_test_{{ temp }}.tgz"
+
+  - name: start test web services
+    command: /usr/local/bin/docker-compose up -d
+    args:
+      chdir: /wordpress_test
+
+  - name: Wordpress test web export and backup complete
+    debug:
+      msg: Wordpress test web services available
