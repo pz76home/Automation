@@ -1,0 +1,83 @@
+- hosts: all
+  vars:
+    site: website
+    database: db
+    path: /path
+
+  tasks:
+
+  - name: Set time
+    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d-%H-%M-%S\"')}}"
+
+  - name: set other facts
+    set_fact:
+      site: www_website1_com
+      database: www_website1_com
+      path: stg.website1.com
+      prod_path: www.website1.com
+      when: site == "www_website1_com"
+
+  - name: set other facts
+    set_fact:
+      site: www_website2_com
+      database: www_website2_com
+      path: stg.website2.com
+      prod_path: www.website2.com
+      when: site == "www_website2_com"
+
+  - name: backup production latest database
+    mysql_db:
+      state: dump
+      login_host: localhost
+      name: "{{ database }}"
+      config_file: /home/admin/.my.cnf
+      target: "/home/admin/backup/{{ site }}_latest.sql"
+
+  - name: backup staging latest web content
+    archive:
+      path: "/var/www/{{ prod_path }}"
+      dest: "/home/admin/backup/{{ prod_path }}.latest.tgz"
+
+  - name: Synchronize DB from production
+    synchronize:
+      mode: pull
+      src: rsync://10.0.0.1/export/{{ site }}_latest.sql
+      dest: /home/admin/import
+      delete: yes
+    delegate_to: "{{ inventory_hostname }}"
+
+  - name: start import
+    debug:
+      msg: "Starting data import process"
+
+  - name: change database configuration for production
+    replace:
+      path: /home/admin/import/{{ site }}_latest.sql
+      regexp: "https://{{ path }}"
+      replace: "https://{{ prod_path }}"
+
+  - name: Synchronize website from production
+    synchronize:
+      mode: pull
+      src: rsync://10.0.0.1/www/{{ path }}
+      dest: /var/www
+      delete: yes
+    delegate_to: "{{ inventory_hostname }}"
+
+  - name: import test database
+    mysql_db:
+      state: import
+      login_host: localhost
+      name: "{{ database }}"
+      config_file: /home/admin/.my.cnf
+      login_user: apache
+      target: /home/admin/import/{{ site }}_latest.sql
+
+  - name: Start production web services
+    systemd:
+      name: httpd
+      state: restarted
+
+  - name: Starting Production web services
+    debug:
+      msg: Wordpress Prod web services available
