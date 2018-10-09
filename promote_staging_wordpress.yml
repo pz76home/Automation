@@ -1,0 +1,45 @@
+- hosts: all
+  vars:
+    site: website
+    database: db
+    path: /path
+
+  tasks:
+  - name: Set time
+    set_fact: temp="{{lookup('pipe','date \"+%Y-%m-%d-%H-%M-%S\"')}}"
+
+  - name: set other facts
+    set_fact:
+      site: www_website1_com
+      database: www_website1_com
+      path: stg.website1.com
+      when: site == "www_website1_com"
+
+  - name: set other facts
+    set_fact:
+      site: www_website2_com
+      database: www_website2_com
+      path: stg.website2.com
+      when: site == "www_website2_com"
+
+# The below is 644 for files and 755 for directories
+  - name: Set correct permissions 
+    file:
+      dest: "/var/www/{{ path }}/files"
+      owner: apache
+      group: apache
+      mode:  "u+rwX,g+rX,o+rX"
+      recurse: yes
+ 
+  - name: backup staging latest database
+    mysql_db:
+      state: dump
+      login_host: localhost
+      name: "{{ database }}"
+      config_file: /home/admin/.my.cnf
+      target: "/home/admin/export/{{ site }}_latest.sql"
+
+  - name: backup staging latest web content
+    archive:
+      path: "/var/www/{{ path }}"
+      dest: "/home/admin/export/{{ path }}.latest.tgz"
