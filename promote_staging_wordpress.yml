@@ -13,14 +13,14 @@
       site: www_website1_com
       database: www_website1_com
       path: stg.website1.com
-      when: site == "www_website1_com"
+    when: site == "www_website1_com"
 
   - name: set other facts
     set_fact:
       site: www_website2_com
       database: www_website2_com
       path: stg.website2.com
-      when: site == "www_website2_com"
+    when: site == "www_website2_com"
 
 # The below is 644 for files and 755 for directories
   - name: Set correct permissions 
