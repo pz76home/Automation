@@ -1,0 +1,18 @@
+  - name: Add redirects
+    become: yes
+    blockinfile:
+      path: /etc/httpd/conf.d/www.work.com.conf
+      insertafter: "</VirtualHost>"
+      backup: yes
+      block: |
+
+        <VirtualHost {{ ip }}:80>
+                ServerName      somewhere.work.com.conf
+                ServerAdmin  webmaster@work.com
+                RedirectMatch 301 ^/ https://www.work.com/redirect/
+                LogLevel debug
+                ErrorLog /var/log/httpd/somewhere.work.com_error.log
+                ErrorLog syslog:local6
+                CustomLog /var/log/httpd/somewhere.work.com_access.log combined
+                CustomLog "|/usr/bin/logger -t somewhere.work.com -p local7.info" combined
+        </VirtualHost>
