@@ -1,0 +1,18 @@
+  vars:
+    envir: STAGING
+    version: 1
+    dayofmonth: "{{ ansible_date_time.day }}"
+    monthdir: "{{ ansible_date_time.month }}"  
+  
+  - name: rename file
+    become: yes
+    copy:
+      src: "/home/user/{{ dayofmonth }}{{ version }}.DAT"
+      dest: "/home/user/{{ envir }}.FILE"
+      owner: user
+      remote_src: yes  
+  
+  - name: Send file to somewhere
+    become: yes
+    become_user: user
+    shell: 'sftp user@transfer.work.com <<< "put /home/user/{{ envir }}.FILE"'
