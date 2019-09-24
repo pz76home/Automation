@@ -1,0 +1,25 @@
+#The vm_list variable has to be populated in this format [ 'vm1', 'vm2', 'vm3' ]
+
+      - name: set other facts
+        set_fact:
+          vcenter_hostname: vcenter.work.com
+          vmware_datacenter: "DC"
+        when: site == "Work"
+  
+      - name: VM snapshot
+        vmware_guest_snapshot:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}@work.com"
+          password: "{{ vcenter_pass }}"
+          datacenter: "{{ vmware_datacenter }}"
+          name: "{{ item }}"
+          folder: "/{{ vmware_datacenter }}/vm"
+          state: "{{ snapshot_state }}"
+          snapshot_name: "{{ item }}_patch"
+        loop: "{{ vm_list }}"
+
+      - name: Processed VM's
+        debug:
+          msg: "{{ item }}"
+        loop: "{{ vm_list }}"
