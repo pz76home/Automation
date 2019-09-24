@@ -1,0 +1,7 @@
+  - name: Synchronize to remote server
+    synchronize:
+      mode: push
+      src:  /var/www/vhost/
+      dest: rsync://servername/dest_name
+      delete: yes
+    delegate_to: "{{ inventory_hostname }}"
