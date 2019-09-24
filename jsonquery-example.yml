@@ -1,0 +1,21 @@
+      - name: Gather Datastore information
+        vmware_datastore_facts:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}@work.com"
+          password: "{{ vcenter_pass }}"
+          datacenter: "{{ vmware_datacenter }}"
+        register: datastore_facts
+
+      - name: Display Datastore name.
+        set_fact:
+          datastore_name: "{{ datastore_facts | json_query('datastores[].name') }}"
+
+      - name: Datastore Capacity
+        set_fact:
+          capacity: "{{ datastore_facts | json_query('datastores[].freeSpace') }}"
+
+      - name: Datastore list output
+        debug:
+          msg: "{{ item.0 }}  - {{ item.1/1024/1024/1024 }} GB"
+        loop: "{{ datastore_name|zip(capacity)|list }}"
