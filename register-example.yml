@@ -1,0 +1,15 @@
+  - name: List files
+    find:
+      paths: /directory/files
+      patterns: 'DS*.txt'
+    register: DS_files
+
+  - name: Copy files to backup directory
+    become: yes
+    copy:
+      src: "{{ item.path }}"
+      dest: "/home/user/backup"
+      owner: user
+      group: accounts
+      remote_src: yes
+    with_items: "{{ DS_files.files }}"
