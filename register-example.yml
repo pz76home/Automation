@@ -10,6 +10,5 @@
       src: "{{ item.path }}"
       dest: "/home/user/backup"
       owner: user
-      group: accounts
       remote_src: yes
     with_items: "{{ DS_files.files }}"
