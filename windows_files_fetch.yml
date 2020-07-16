@@ -1,0 +1,36 @@
+- hosts: all
+
+  vars:
+
+  tasks:
+
+  - name: Search for data file
+    win_find:
+      paths: C:\data
+      patterns: [ 'data_*.csv' ]
+      age: -1d
+    register: data_file
+
+  - name: Search for data filename
+    win_find:
+      paths: C:\data
+      patterns: [ 'data_*.csv' ]
+      age: -1d
+    register: data_filename
+
+  - name: Check for file
+    fail: msg="no data file exists"
+    when: data_file.matched == 0
+
+  - name: Fetch data file
+    fetch:
+      src: "C:/data/{{ item.filename }}"
+      dest: /mnt/data/
+      flat: yes
+    with_items: "{{ data_filename.files }}"
+
+  - name: Clean data file
+    win_file:
+      path: "C:/data/{{ item.filename }}"
+      state: absent
+    with_items: "{{ data_filename.files }}"
