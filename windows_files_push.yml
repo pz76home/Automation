@@ -1,0 +1,42 @@
+- hosts: all
+
+  vars:
+
+  tasks:
+
+  - name: Copy data file
+    become: yes
+    copy:
+      src: "{{ item }}"
+      dest: /home/data
+      owner: data
+    with_fileglob: /mnt/data/data_*.csv
+
+  - name: Search for data file
+    become: yes
+    find:
+      paths: "/home/data/"
+      patterns: 'data_*.csv'
+    register: data_filename
+
+  - name: Copy data file to backup directory
+    become: yes
+    copy:
+      src: "{{ item.path }}"
+      dest: "/home/data/backup/"
+      owner: data
+      remote_src: yes
+    with_items: "{{ data_filename.files }}"
+
+  - name: Send data file
+    become: yes
+    become_user: data
+    shell: 'sftp data@sftp.remote.com <<< "put {{ item.path }} /remote_data"'
+    with_items: "{{ data_filename.files }}"
+
+  - name: Clean data file
+    become: yes
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ data_filename.files }}"
