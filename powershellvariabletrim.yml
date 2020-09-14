@@ -1,0 +1,41 @@
+- hosts: all
+
+  vars:
+   
+  tasks:
+
+  - name: Month Variable
+    win_shell: (get-date).AddMonths(-1).Month.ToString("00")
+    register: month
+
+  - name: Year Variable
+    win_shell: (get-date).AddMonths(-1).Year
+    register: year
+   
+  - name: Search for a file
+    win_find:
+      paths: C:\Directory
+      patterns: [ 'data.csv' ]
+      age: -8d
+    register: data_file
+
+  - name: Check for file
+    fail: msg="no data file exists"
+    when: data_file.matched == 0
+
+  - name: Copy data file
+    win_copy:
+      src: "C:/Directory/data.csv"
+      dest: "C:/Directory/{{ year.stdout | trim }}-{{ month.stdout | trim  }}-DAC.CSV"
+      remote_src: yes
+    
+  - name: Fetch data file 
+    fetch:
+      src: "C:/Directory/{{ year.stdout | trim  }}-{{ month.stdout | trim }}-DAC.CSV"
+      dest: /mnt/data/
+      flat: yes
+
+  - name: Clean data file
+    win_file:
+      path: "C:/Directory/{{ year.stdout | trim  }}-{{ month.stdout | trim }}-DAC.CSV"
+      state: absent
