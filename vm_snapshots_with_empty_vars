@@ -1,0 +1,89 @@
+  - name: Patching VM snapshots 
+    hosts: localhost
+    gather_facts: no
+    connection: local
+    vars:
+      notes: Created by Ansible
+      server1:
+      server2:
+      server3:
+      server4:
+      server5:
+      server6:
+      server7:
+      server8:
+      server9:
+      server10:
+      dumpfacts: false
+    tasks:
+
+      - name: Check for vSphere access parameters
+        fail: msg="Must set vcenter_user and vcenter_pass in a Vault"
+        when: (vcenter_user is not defined) or (vcenter_pass is not defined)
+
+      - name: set other facts
+        set_fact:
+          vcenter_hostname: 192.168.1.1
+          vmware_datacenter: "Primary Datacenter"
+        when: site == "Primary"
+
+      - name: set other facts
+        set_fact:
+          vcenter_hostname: 192.168.1.2
+          vmware_datacenter: "Secondary Datacenter"
+        when: site == "Secondary"
+
+      - name: "Find folder for VM - {{ item }}"
+        vmware_guest_info:
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}@example.com"
+          password: "{{ vcenter_pass }}"
+          datacenter: "{{ vmware_datacenter }}"
+          validate_certs: False
+          name: "{{ item }}"
+        when: item != ""
+        loop: 
+          - "{{ server1 }}"
+          - "{{ server2 }}"
+          - "{{ server3 }}"
+          - "{{ server4 }}"
+          - "{{ server5 }}"
+          - "{{ server6 }}"
+          - "{{ server7 }}"
+          - "{{ server8 }}"
+          - "{{ server9 }}"
+          - "{{ server10 }}"
+        delegate_to: localhost
+        register: vm_facts  
+
+      - name: Check for required variables
+        fail: msg="Must pass VM names"
+        when: vm_facts is not defined
+
+      - name: Set VM name
+        set_fact:
+          vm_name: "{{ vm_facts | json_query('results[].instance.hw_name') }}"
+
+      - name: Set VM folder
+        set_fact:
+          vm_folder: "{{ vm_facts | json_query('results[].instance.hw_folder') }}"  
+
+      - name: VM snapshot
+        vmware_guest_snapshot:
+          validate_certs: no
+          hostname: "{{ vcenter_hostname }}"
+          username: "{{ vcenter_user }}@example.com"
+          password: "{{ vcenter_pass }}"
+          datacenter: "{{ vmware_datacenter }}"
+          name: "{{ item[0] }}"
+          folder: "{{ item[1] }}"
+          state: "{{ snapshot_state }}"
+          snapshot_name: "{{ item[0] }}_patch"
+        with_nested:
+          - "{{ vm_name }}"
+          - "{{ vm_folder }}"
+     
+      - name: Processed VM's
+        debug:
+          msg: "{{ item }}"
+        loop: "{{ vm_name }}"
